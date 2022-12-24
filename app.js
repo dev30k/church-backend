@@ -1,8 +1,9 @@
 import express from 'express';
 import bodyParser from 'body-parser';
+import church from "./src/routes/church.js";
 import cors from 'cors';
-import church from "./routes/church.js";
 import dotenv from 'dotenv';
+
 dotenv.config()
 
 const CORS = cors();
