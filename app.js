@@ -8,6 +8,7 @@ dotenv.config()
 const CORS = cors();
 const app = express();
 const PORT = process.env.PORT ||5000;
+const HOSTNAME = '127.0.0.1'
 
 app.use(express.urlencoded({ extended: false }));
 
@@ -16,4 +17,4 @@ app.use(bodyParser.json());
 app.use('/church_sys/api/v1/', church);
 app.get('/', (req, res) => res.send('Congratulations you have reached the Hearts Blaze API!!!'));
 
-app.listen(PORT, () => console.log(`listening on Port 'http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`listening on Port 'http://${HOSTNAME}:${PORT}`));
