@@ -1,11 +1,22 @@
-import express from 'express';
-import mysql from 'mysql'
-import multer from 'multer';
-import bcrypt from 'bcrypt';
-import jwt from "jsonwebtoken";
-import dotenv from 'dotenv';
+const express = require('express');
+const mysql = require('mysql');
+const multer = require('multer');
+const bcrypt = require('bcrypt');
+const jwt = require("jsonwebtoken");
+const dotenv = require('dotenv');
+const Mpesa = require("mpesa-api").Mpesa;
 
-dotenv.config()
+dotenv.config();
+
+const credentials = {
+    clientKey: process.env.SECRET_KEY,
+    clientSecret: process.env.CLIENT_SECRET,
+    securityCredential: process.env.SEC_CRED,
+    certificatePath: null
+};
+const environment = "sandbox";
+const mpesa = new Mpesa(credentials,environment);
+
 
 
 const router = express.Router();
@@ -13,8 +24,9 @@ const router = express.Router();
 
 var imgconfig = multer.diskStorage({
     destination:(req,file,callback)=>{
-        callback(null,"./uploads");
+        callback(null,"/home/lemurian/public_html/src/images/");
     },
+    
     filename:(req,file,callback)=>{
         callback(null,`image-${Date.now()}.${file.originalname}`)
     }
@@ -26,7 +38,7 @@ const isImage = (req,file,callback)=>{
     if(file.mimetype.startsWith("image")){
         callback(null,true)
     }else{
-        callback(null,Error("only image is allowd"))
+        callback(null,Error("only image is allowed"))
     }
 }
 
@@ -37,13 +49,14 @@ var upload = multer({
 const TABLE_SERMONS = 'sermons';
 const TABLE_EVENTS = 'events';
 const TABLE_ADMINS = 'ADMINS';
+const TABLE_LIVE = "livestreams";
+const TABLE_DONATIONS = "donations";
 
 const connection = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: 'Lemuria123',
-    database: 'church_sys',
-    port: "3306"
+    host: "localhost",
+    user: "lemurian_hearts_admin",
+    password: "svvJHUjH2Z289xN",
+    database:"lemurian_hearts_church_sys",
 
 });
 
@@ -58,6 +71,39 @@ connection.connect(function (err) {
     console.log('connected to DATABASE ');
 });
 
+router.post('/mpesa', async (req, res) => {
+     const {
+            MerchantRequestID,
+            CheckoutRequestID,
+            ResultCode,
+            ResultDesc,
+            CallbackMetadata
+        }   = req.body.Body.stkCallback
+        
+     const meta = Object.values(await CallbackMetadata.Item)
+        const PhoneNumber = meta.find(o => o.Name === 'PhoneNumber').Value.toString()
+        const Amount = meta.find(o => o.Name === 'Amount').Value.toString()
+        const MpesaReceiptNumber = meta.find(o => o.Name === 'MpesaReceiptNumber').Value.toString()
+        const TransactionDate = meta.find(o => o.Name === 'TransactionDate').Value.toString()
+    res.send(meta);
+
+
+  
+
+  // insert data into the database
+  const sql = `INSERT INTO mpesa_transactions (transaction_id, amount, status)
+               VALUES (?, ?, ?)`;
+
+//   await connection.query(sql, [phoneNumber, Amount,MpesaReceiptNumber], (err, rows) => {
+//     if(err){
+//       console.log(err);
+//       res.send(err);
+//     } else {
+//       res.send(rows);
+//     }
+//   });
+});
+
 router.post('/sermon/add',upload.single("sermonImage"),async (req,res)=>{
     const {filename} = req.file;
 
@@ -66,7 +112,7 @@ router.post('/sermon/add',upload.single("sermonImage"),async (req,res)=>{
     await connection.query(sql,[req.body.title,req.body.speaker,req.body.sermon_link,req.body.sermon_date,req.body.sermon_time,filename],(err,rows) =>{
         if(err){
             console.log(err);
-            res.json(err);
+            res.send(err);
             
         }else{
            
@@ -83,7 +129,7 @@ router.post('/events/add/',upload.single("eventImage"),async (req,res)=>{
     await connection.query(sql,[req.body.eventTitle,req.body.location,req.body.start_time,req.body.event_date,req.body.registration,filename],(err,rows) =>{
         if(err){
             console.log(err);
-            res.json(err);
+            res.send(err);
         }else{
             res.json(rows);
         }
@@ -97,6 +143,7 @@ router.post('/login',async(req,res) =>{
         if(err){
             res.json(err);
         }else{
+            console.log(rows);
             if(rows.length > 0){
                 bcrypt.compare(req.body.password, rows[0].password, (error, response)=>{
                     let tokens = rows[0].username
@@ -107,7 +154,7 @@ router.post('/login',async(req,res) =>{
                     if(response){  
                            const token = jwt.sign(
                             {  user_id:key,tokens },
-                            process.env.TOKEN_KEY,
+                            "1212WEWWE32321212+{}{@!@!21323POEOR//|d[]}",
                             {
                               expiresIn: "2h",
                             }
@@ -123,18 +170,74 @@ router.post('/login',async(req,res) =>{
                     }
                 })
             }else{
-                res.send({message:"Incorrect Username"})
+                res.send({message:"Incorrect Username/Password"})
             };
         }
 
 
 
     })
-})
+});
 
-router.put("/sermons/edit/:id",async (req,res) =>{
+router.post('/live/add',async (req,res)=>{
+
+
+    const sql = 'insert into '+ TABLE_LIVE + '(live_link,live_duration) values(?,?)';
+    await connection.query(sql,[req.body.live_link,req.body.live_duration],(err,rows) =>{
+        if(err){
+            console.log(err);
+            res.send(err);
+            
+        }else{
+           
+            res.send(rows)
+        }
+
+    })
+
+});
+router.post('/mpesa/donations',async (req,res)=>{
+    console.log(req.body);
+
+
+    const sql = 'insert into '+ TABLE_DONATIONS + '(live_link,live_duration) values(?,?)';
+   
+
+});
+
+router.post('/mpesa/donate',async(req,res)=>{
+    let accountNo = "333570#"
+   mpesa
+  .lipaNaMpesaOnline({
+    BusinessShortCode: 174379, // Lipa Na Mpesa Online Shortcode on test credentials page
+    Amount: req.body.amount /* 1000 is an example amount */,
+    PartyA:  req.body.phoneNumber, // use your real phone number
+    PartyB: 174379, // LiAccount Referencepa Na Mpesa Online Shortcode on test credentials page
+    PhoneNumber:  req.body.phoneNumber, // use your real phone number
+    CallBackURL:
+      "https://churchbackend.lemurianfunk.buzz/church_sys/api/v1/mpesa", // this is where the api sends a callback. It must a hosted endpoint with public access.
+    AccountReference: accountNo.concat(req.body.name) , // This is what the customer would have put as account number if they used normal mpesa
+    passKey: 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919', // Lipa na mpesa passkey in test credentials page
+    TransactionType: "CustomerPayBillOnline" /* OPTIONAL */,
+    TransactionDesc: "Sending Money" /* OPTIONAL */,
+  })
+  .then((response) => {
+    // res.send(response);
+    
+  })
+  .catch((error) => {
+  
+    res.send(error)
+  });
+  
+
+});
+
+router.put("/sermons/edit/:id",upload.single("sermonImage"),async (req,res) =>{
+    const {filename} = req.file;
+
     const sql = 'update ' +TABLE_SERMONS+ ' set ? where ID = ?';
-    await connection.query(sql,[{title:req.body.title,speaker:req.body.speaker,sermon_link:req.body.sermon_link,sermon_date:req.body.sermon_date},req.params.id],(err,rows) =>{
+    await connection.query(sql,[{title:req.body.title,speaker:req.body.speaker,sermon_link:req.body.sermon_link,sermon_date:req.body.sermon_date,sermonImage:filename},req.params.id],(err,rows) =>{
         if(err){
             console.log(err);
             res.send(err);
@@ -147,9 +250,12 @@ router.put("/sermons/edit/:id",async (req,res) =>{
 
 
 });
-router.put("/events/edit/:id",async (req,res) =>{
+router.put("/events/edit/:id",upload.single("eventImage"),async (req,res) =>{
+    
+    const {filename} = req.file;
+
     const sql = 'update ' +TABLE_EVENTS+ ' set ? where ID = ?';
-    await connection.query(sql,[{location:req.body.location,start_time:req.body.start_time,event_date:req.body.event_date,registration:req.body.registration,eventTitle:req.body.eventTitle},req.params.id],(err,rows) =>{
+    await connection.query(sql,[{location:req.body.location,start_time:req.body.start_time,event_date:req.body.event_date,registration:req.body.registration,eventTitle:req.body.eventTitle,eventImage:filename},req.params.id],(err,rows) =>{
         if(err){
             res.send(err);
         }else{
@@ -208,6 +314,27 @@ router.get('/sermons',async (req,res)=>{
     })
 
 });
+router.get('/mpesaresponse', (req, res) => {
+    console.log(req.body);
+    res.send(req);
+    console.log('Request received.');
+    res.send('Request received.');
+});
+
+router.get('/livestreams',async (req,res)=>{
+
+    const sql = 'select * from '+ TABLE_LIVE;
+    await connection.query(sql,(err,rows) =>{
+        if(err){
+            console.log(err);
+            res.send(err);
+        }else{
+            res.send(rows);
+        }
+
+    })
+
+});
 router.get('/events',async (req,res)=>{
 
     const sql = 'select * from '+ TABLE_EVENTS;
@@ -244,4 +371,4 @@ router.delete('/events/:id',async (req,res)=>{
     });
     }
 )
-export default  router;
+exports.router = router;
